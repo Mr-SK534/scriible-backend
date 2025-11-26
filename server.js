@@ -16,6 +16,7 @@ const WORD_LIST = ["cat","dog","house","tree","car","sun","moon","star","fish","
 io.on('connection', (socket) => {
   console.log('Connected:', socket.id);
 
+  // CREATE & JOIN ROOM (unchanged)
   socket.on('createRoom', (code, name, numRounds = 6) => {
     code = code.toUpperCase();
     if (rooms[code]) return socket.emit('errorMsg', 'Room exists!');
@@ -56,6 +57,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // CHOOSE WORD — SHOW TO DRAWER IN CHAT
   socket.on('chooseWord', (word) => {
     const room = Object.values(rooms).find(r => r.currentDrawer === socket.id);
     if (!room || !word) return;
@@ -65,25 +67,18 @@ io.on('connection', (socket) => {
     room.guessedPlayers = new Set();
     room.roundStartTime = Date.now();
 
-    // Show word only to drawer
-    socket.emit('message', { user: 'Private', text: `Your word: ${word}` });
+    socket.emit('message', { user: 'You', text: `Drawing: <strong style="color:#4CAF50;">${word}</strong>` });
+
     const hint = word.split('').map((c, i) => i % 2 === 0 ? c : '_').join(' ');
     io.to(room.code).emit('wordHint', hint);
     io.to(room.code).emit('message', { user: 'System', text: 'Word chosen! Start guessing!' });
     startTimer(room.code);
   });
 
-  socket.on('draw', data => {
-    const roomCode = [...socket.rooms][1];
-    if (roomCode) socket.to(roomCode).emit('draw', data);
-  });
+  socket.on('draw', data => socket.to([...socket.rooms][1]).emit('draw', data));
+  socket.on('clearCanvas', () => socket.to([...socket.rooms][1]).emit('clearCanvas'));
 
-  socket.on('clearCanvas', () => {
-    const roomCode = [...socket.rooms][1];
-    if (roomCode) socket.to(roomCode).emit('clearCanvas');
-  });
-
-  // CHAT & GUESSING — FULLY FIXED
+  // GUESSING — EVERYONE SEES POINTS + DRAWER BONUS
   socket.on('chatMessage', (msg) => {
     const room = Object.values(rooms).find(r => r.players[socket.id]);
     if (!room) return;
@@ -91,25 +86,18 @@ io.on('connection', (socket) => {
     const player = room.players[socket.id];
     const guess = msg.trim().toLowerCase();
 
-    // Drawer chatting
     if (socket.id === room.currentDrawer) {
       io.to(room.code).emit('message', { user: player.name, text: msg });
       return;
     }
 
-    // Already guessed
-    if (room.guessedPlayers.has(socket.id)) {
-      socket.emit('errorMsg', 'You already guessed!');
-      return;
-    }
+    if (room.guessedPlayers.has(socket.id)) return;
 
-    // Too close
     if (room.currentWord && room.currentWord.toLowerCase().includes(guess) && guess.length > 2) {
       socket.emit('errorMsg', 'Too close!');
       return;
     }
 
-    // CORRECT GUESS
     if (room.currentWord && guess === room.currentWord.toLowerCase()) {
       room.guessedPlayers.add(socket.id);
 
@@ -118,23 +106,27 @@ io.on('connection', (socket) => {
       const drawerBonus = Math.round(guesserPoints * 0.4);
 
       player.score += guesserPoints;
+      let drawerName = "the drawer";
       if (room.currentDrawer) {
         room.players[room.currentDrawer].score += drawerBonus;
+        drawerName = room.players[room.currentDrawer].name;
       }
 
-      // Tell guesser
+      // GUESSER SEES THEIR POINTS
       socket.emit('message', { user: 'System', text: `Correct! +${guesserPoints} pts` });
 
-      // Tell drawer they got bonus
+      // DRAWER SEES THEIR BONUS
       if (room.currentDrawer) {
-        io.to(room.currentDrawer).emit('message', { user: 'System', text: `+${drawerBonus} pts (bonus)` });
+        io.to(room.currentDrawer).emit('message', { user: 'System', text: `+${drawerBonus} pts (guessed!)` });
       }
 
-      // Tell everyone
-      io.to(room.code).emit('correctGuess', player.name, guesserPoints);
-      io.to(room.code).emit('message', { user: 'System', text: `${player.name} guessed "${room.currentWord}"!` });
+      // EVERYONE SEES POINTS
+      io.to(room.code).emit('message', {
+        user: 'System',
+        text: `<strong>${player.name}</strong> guessed it! → +${guesserPoints} pts${drawerBonus > 0 ? ` | <strong>${drawerName}</strong> +${drawerBonus} pts` : ''}`
+      });
 
-      // UPDATE SCORES — THIS FIXES THE PROBLEM
+      // UPDATE SCORES INSTANTLY
       io.to(room.code).emit('updatePlayers', Object.values(room.players));
 
       if (room.guessedPlayers.size >= Object.keys(room.players).length - 1) {
@@ -145,11 +137,10 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Normal message
     io.to(room.code).emit('message', { user: player.name, text: msg });
   });
 
-  // NEXT ROUND + AUTO WORD (Drawer sees it!)
+  // NEXT ROUND + AUTO WORD
   function nextRound(code) {
     const room = rooms[code];
     if (!room) return;
@@ -164,23 +155,21 @@ io.on('connection', (socket) => {
 
     io.to(code).emit('newRound', room.round, room.maxRounds, drawerId, room.players[drawerId].name);
     io.to(code).emit('clearCanvas');
-    io.to(code).emit('wordHint', 'Waiting for word...');
+    io.to(code).emit('wordHint', 'Waiting...');
 
     const choices = WORD_LIST.sort(() => Math.random() - 0.5).slice(0, 3);
     io.to(drawerId).emit('yourTurn', choices);
 
-    // AUTO SELECT AFTER 15s — Drawer sees the word!
     room.wordChoiceTimeout = setTimeout(() => {
       if (!room.currentWord) {
-        const autoWord = choices[0];
-        room.currentWord = autoWord;
+        const word = choices[0];
+        room.currentWord = word;
         room.roundStartTime = Date.now();
 
-        // SHOW AUTO WORD TO DRAWER ONLY
-        io.to(drawerId).emit('message', { user: 'Private', text: `Auto-selected word: ${autoWord}` });
-
+        io.to(drawerId).emit('message', { user: 'You', text: `Auto-selected: <strong style="color:#FF9800;">${word}</strong>` });
         io.to(code).emit('message', { user: 'System', text: 'Drawer was AFK — word auto-selected!' });
-        const hint = autoWord.split('').map((c,i) => i%2===0?c:'_').join(' ');
+
+        const hint = word.split('').map((c,i) => i%2===0?c:'_').join(' ');
         io.to(code).emit('wordHint', hint);
         startTimer(code);
       }
@@ -217,8 +206,10 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     for (const code in rooms) {
       if (rooms[code].players[socket.id]) {
+        const name = rooms[code].players[socket.id].name;
         delete rooms[code].players[socket.id];
         io.to(code).emit('updatePlayers', Object.values(rooms[code].players));
+        io.to(code).emit('message', { user: 'System', text: `${name} left the game` });
         if (Object.keys(rooms[code].players).length === 0) {
           clearInterval(rooms[code].timer);
           if (rooms[code].wordChoiceTimeout) clearTimeout(rooms[code].wordChoiceTimeout);
