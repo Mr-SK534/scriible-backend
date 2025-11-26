@@ -200,6 +200,7 @@ document.getElementById('chatSendBtn').onclick = sendChat;
 function addMessage(user, text) {
   const div = document.createElement('div');
   div.innerHTML = `<strong>${user}:</strong> ${text}`;
+  div.style.marginBottom = '6px';
   document.getElementById('messages').appendChild(div);
   div.scrollIntoView({ behavior: 'smooth' });
 }

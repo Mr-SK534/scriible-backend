@@ -16,7 +16,6 @@ const WORD_LIST = ["cat","dog","house","tree","car","sun","moon","star","fish","
 io.on('connection', (socket) => {
   console.log('Connected:', socket.id);
 
-  // CREATE & JOIN ROOM (unchanged)
   socket.on('createRoom', (code, name, numRounds = 6) => {
     code = code.toUpperCase();
     if (rooms[code]) return socket.emit('errorMsg', 'Room exists!');
@@ -57,7 +56,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // CHOOSE WORD — SHOW TO DRAWER IN CHAT
+  // WORD CHOSEN — SHOW TO DRAWER IN CHAT
   socket.on('chooseWord', (word) => {
     const room = Object.values(rooms).find(r => r.currentDrawer === socket.id);
     if (!room || !word) return;
@@ -67,7 +66,8 @@ io.on('connection', (socket) => {
     room.guessedPlayers = new Set();
     room.roundStartTime = Date.now();
 
-    socket.emit('message', { user: 'You', text: `Drawing: <strong style="color:#4CAF50;">${word}</strong>` });
+    // DRAWER SEES WORD
+    socket.emit('message', { user: 'You', text: `Your word: <strong style="color:#4CAF50;">${word}</strong>` });
 
     const hint = word.split('').map((c, i) => i % 2 === 0 ? c : '_').join(' ');
     io.to(room.code).emit('wordHint', hint);
@@ -78,7 +78,7 @@ io.on('connection', (socket) => {
   socket.on('draw', data => socket.to([...socket.rooms][1]).emit('draw', data));
   socket.on('clearCanvas', () => socket.to([...socket.rooms][1]).emit('clearCanvas'));
 
-  // GUESSING — EVERYONE SEES POINTS + DRAWER BONUS
+  // CORRECT GUESS — EVERYONE SEES POINTS + DRAWER BONUS
   socket.on('chatMessage', (msg) => {
     const room = Object.values(rooms).find(r => r.players[socket.id]);
     if (!room) return;
@@ -106,27 +106,27 @@ io.on('connection', (socket) => {
       const drawerBonus = Math.round(guesserPoints * 0.4);
 
       player.score += guesserPoints;
-      let drawerName = "the drawer";
+      let drawerName = "Drawer";
       if (room.currentDrawer) {
         room.players[room.currentDrawer].score += drawerBonus;
         drawerName = room.players[room.currentDrawer].name;
       }
 
-      // GUESSER SEES THEIR POINTS
+      // GUESSER SEES POINTS
       socket.emit('message', { user: 'System', text: `Correct! +${guesserPoints} pts` });
 
-      // DRAWER SEES THEIR BONUS
+      // DRAWER SEES BONUS
       if (room.currentDrawer) {
         io.to(room.currentDrawer).emit('message', { user: 'System', text: `+${drawerBonus} pts (guessed!)` });
       }
 
-      // EVERYONE SEES POINTS
+      // EVERYONE SEES POINTS — NOW WORKS 100%
       io.to(room.code).emit('message', {
         user: 'System',
         text: `<strong>${player.name}</strong> guessed it! → +${guesserPoints} pts${drawerBonus > 0 ? ` | <strong>${drawerName}</strong> +${drawerBonus} pts` : ''}`
       });
 
-      // UPDATE SCORES INSTANTLY
+      // SCORES UPDATE INSTANTLY
       io.to(room.code).emit('updatePlayers', Object.values(room.players));
 
       if (room.guessedPlayers.size >= Object.keys(room.players).length - 1) {
@@ -140,7 +140,6 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('message', { user: player.name, text: msg });
   });
 
-  // NEXT ROUND + AUTO WORD
   function nextRound(code) {
     const room = rooms[code];
     if (!room) return;
@@ -166,8 +165,9 @@ io.on('connection', (socket) => {
         room.currentWord = word;
         room.roundStartTime = Date.now();
 
+        // AUTO WORD — DRAWER SEES IT
         io.to(drawerId).emit('message', { user: 'You', text: `Auto-selected: <strong style="color:#FF9800;">${word}</strong>` });
-        io.to(code).emit('message', { user: 'System', text: 'Drawer was AFK — word auto-selected!' });
+        io.to(code).emit('message', { user: 'System', text: 'Drawer was slow — word auto-selected!' });
 
         const hint = word.split('').map((c,i) => i%2===0?c:'_').join(' ');
         io.to(code).emit('wordHint', hint);
@@ -209,7 +209,7 @@ io.on('connection', (socket) => {
         const name = rooms[code].players[socket.id].name;
         delete rooms[code].players[socket.id];
         io.to(code).emit('updatePlayers', Object.values(rooms[code].players));
-        io.to(code).emit('message', { user: 'System', text: `${name} left the game` });
+        io.to(code).emit('message', { user: 'System', text: `${name} left` });
         if (Object.keys(rooms[code].players).length === 0) {
           clearInterval(rooms[code].timer);
           if (rooms[code].wordChoiceTimeout) clearTimeout(rooms[code].wordChoiceTimeout);
