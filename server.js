@@ -21,7 +21,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 
 // ==================== GAME STATE ====================
 const rooms = {};
-const MAX_ROUNDS = 6;
+
 const ROUND_TIME = 80;
 
 const wordList = [
@@ -58,10 +58,14 @@ io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
   // Create room
-  socket.on('createRoom', (code, name = 'Host') => {
+  socket.on('createRoom', (code, name = 'Host', rounds = MAX_ROUNDS_DEFAULT) => {
     if (!code) return socket.emit('roomError', 'Invalid code');
     code = code.toUpperCase();
     if (rooms[code]) return socket.emit('roomError', 'Room exists');
+
+    // FIX: clamp rounds between 3 and 20
+    const maxRounds = Math.max(3, Math.min(20, parseInt(rounds) || MAX_ROUNDS_DEFAULT));
+
     rooms[code] = {
       code,
       players: {},
@@ -72,7 +76,8 @@ io.on('connection', (socket) => {
       gameStarted: false,
       timer: null,
       roundStartTime: null,
-      guessedPlayers: new Set()
+      guessedPlayers: new Set(),
+      maxRounds: maxRounds  // ← This was missing before!
     };
     joinPlayerToRoom(socket, code, name);
   });
