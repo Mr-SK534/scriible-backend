@@ -5,7 +5,10 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: "*" } });
+const io = socketIo(server, {
+  cors: { origin: "*" },
+  transports: ['websocket', 'polling']  // Critical fix for Render
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -56,7 +59,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // WORD CHOSEN — SHOW TO DRAWER IN CHAT
   socket.on('chooseWord', (word) => {
     const room = Object.values(rooms).find(r => r.currentDrawer === socket.id);
     if (!room || !word) return;
@@ -66,7 +68,6 @@ io.on('connection', (socket) => {
     room.guessedPlayers = new Set();
     room.roundStartTime = Date.now();
 
-    // DRAWER SEES WORD
     socket.emit('message', { user: 'You', text: `Your word: <strong style="color:#4CAF50;">${word}</strong>` });
 
     const hint = word.split('').map((c, i) => i % 2 === 0 ? c : '_').join(' ');
@@ -78,7 +79,6 @@ io.on('connection', (socket) => {
   socket.on('draw', data => socket.to([...socket.rooms][1]).emit('draw', data));
   socket.on('clearCanvas', () => socket.to([...socket.rooms][1]).emit('clearCanvas'));
 
-  // CORRECT GUESS — EVERYONE SEES POINTS + DRAWER BONUS
   socket.on('chatMessage', (msg) => {
     const room = Object.values(rooms).find(r => r.players[socket.id]);
     if (!room) return;
@@ -112,21 +112,16 @@ io.on('connection', (socket) => {
         drawerName = room.players[room.currentDrawer].name;
       }
 
-      // GUESSER SEES POINTS
       socket.emit('message', { user: 'System', text: `Correct! +${guesserPoints} pts` });
-
-      // DRAWER SEES BONUS
       if (room.currentDrawer) {
         io.to(room.currentDrawer).emit('message', { user: 'System', text: `+${drawerBonus} pts (guessed!)` });
       }
 
-      // EVERYONE SEES POINTS — NOW WORKS 100%
       io.to(room.code).emit('message', {
         user: 'System',
         text: `<strong>${player.name}</strong> guessed it! → +${guesserPoints} pts${drawerBonus > 0 ? ` | <strong>${drawerName}</strong> +${drawerBonus} pts` : ''}`
       });
 
-      // SCORES UPDATE INSTANTLY
       io.to(room.code).emit('updatePlayers', Object.values(room.players));
 
       if (room.guessedPlayers.size >= Object.keys(room.players).length - 1) {
@@ -165,7 +160,6 @@ io.on('connection', (socket) => {
         room.currentWord = word;
         room.roundStartTime = Date.now();
 
-        // AUTO WORD — DRAWER SEES IT
         io.to(drawerId).emit('message', { user: 'You', text: `Auto-selected: <strong style="color:#FF9800;">${word}</strong>` });
         io.to(code).emit('message', { user: 'System', text: 'Drawer was slow — word auto-selected!' });
 

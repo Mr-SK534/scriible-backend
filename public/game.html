@@ -1,60 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Skribbl Clone – Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scriible - Draw & Guess</title>
+  <style>
+    body { margin:0; font-family: Arial; background: #1a1a2e; color: #eee; }
+    .hidden { display: none !important; }
+    #menu, #game { padding: 20px; text-align: center; }
+    input, button { padding: 12px; margin: 8px; font-size: 16px; }
+    #game { display: flex; flex-direction: column; height: 100vh; }
+    #canvasContainer { flex: 1; background: #16213e; display: flex; justify-content: center; align-items: center; }
+    canvas { background: white; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+    #sidebar { display: flex; gap: 20px; padding: 10px; background: #16213e; }
+    #chat, #players { flex: 1; background: #0f3460; border-radius: 10px; padding: 10px; max-height: 300px; overflow-y: auto; }
+    #messages { min-height: 200px; }
+    .palette-swatch { width: 30px; height: 30px; display: inline-block; margin: 4px; border: 2px solid #333; cursor: pointer; border-radius: 50%; }
+    .palette-swatch.selected { border: 3px solid white; transform: scale(1.2); }
+    #wordChoices { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #16213e; padding: 20px; border-radius: 15px; z-index: 100; }
+    #wordChoices button { margin: 10px; padding: 15px 25px; font-size: 18px; }
+  </style>
 </head>
 <body>
-  <header>
-    <h1 style="color:#FFA447;font-size:2em;margin-bottom:8px;">Draw & Guess Game</h1>
-  </header>
-
   <div id="menu">
-    <input id="username" type="text" placeholder="Enter your name" maxlength="16">
-    <input id="roomCode" type="text" placeholder="Room code (6 letters)" maxlength="6" style="text-transform:uppercase">
-    
-    <!-- NEW: Choose Number of Rounds -->
-    <div style="margin: 20px 0; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 18px; color:#fff;">
-      <label for="numRounds">Rounds:</label>
-      <input id="numRounds" type="number" min="3" max="20" value="6" 
-             style="width: 90px; padding: 12px; font-size: 18px; text-align: center; border-radius: 8px; border: 2px solid #FFA447; background:#394867; color:#fff;">
-    </div>
-
+    <h1 style="color:#ee6c4d;">Scriible</h1>
+    <input type="text" id="username" placeholder="Your Name" value="Player"/>
+    <br/>
+    <input type="number" id="numRounds" min="3" max="20" value="6" style="width:80px;"/>
     <button onclick="createRoom()">Create Room</button>
+    <br/>
+    <input type="text" id="roomCode" placeholder="Room Code"/>
     <button onclick="joinRoom()">Join Room</button>
-    <div id="error" style="color:#ff6b6b; min-height:24px; margin-top:10px;"></div>
+    <p id="error" style="color:red; height:20px;"></p>
   </div>
 
   <div id="game" class="hidden">
-    <div id="topBar" style="background:#333;">
-      <div id="roomDisplay" style="color:#FFA447;font-weight:bold;">Room:</div>
-      <div id="roundInfo" style="color:#fff;">Round 0/6</div>
-      <div id="timer" style="color:#FFA447;">80</div>
+    <div style="background:#16213e;padding:10px;">
+      <span>Room: <strong id="roomDisplay"></strong></span> |
+      <span id="roundInfo">Round 0/6</span> |
+      <span>Time: <strong id="timer">80</strong></span> |
+      <span>Hint: <strong id="wordHint">Waiting...</strong></span>
     </div>
-    <div id="main">
-      <div id="chatPanel">
-        <h3 style="color:#00B4D8;margin-bottom:8px;">Guess Chat</h3>
-        <div id="chat"><div id="messages"></div></div>
-        <div id="chatInputRow">
-          <input type="text" id="chatInput" placeholder="Type guess or message..." maxlength="100">
-          <button id="chatSendBtn">Send</button>
-        </div>
-      </div>
-      <canvas id="canvas" width="800" height="500"></canvas>
-      <div id="sidebar">
-        <div id="players" style="margin-bottom:17px;text-align:left;"></div>
-        <div id="wordHint" style="font-size:26px;font-weight:bold;color:#FFA447;">Waiting...</div>
-        <div id="wordChoices" class="hidden"></div>
-        <div id="colorPalette" style="margin:12px 0;"></div>
-        <input type="color" id="colorPicker" value="#000000">
-        <div id="colorNameDisplay" style="margin:5px 0; color:#FFA447;"></div>
-        <label for="brushSize">Brush Size:</label>
-        <input type="range" id="brushSize" min="2" max="36" value="5" style="width:100%;">
+
+    <div id="canvasContainer">
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="sidebar">
+      <div>
+        <div id="players"></div>
+        <div id="colorPalette"></div>
+        <input type="color" id="colorPicker" value="#000000"/>
+        <input type="range" id="brushSize" min="1" max="20" value="5"/>
         <button id="clearBtn">Clear Canvas</button>
+        <div id="colorNameDisplay">Color: Black</div>
+      </div>
+
+      <div id="chat">
+        <div id="messages"></div>
+        <input type="text" id="chatInput" placeholder="Type guess..." autocomplete="off"/>
+        <button id="chatSendBtn">Send</button>
       </div>
     </div>
+
+    <div id="wordChoices" class="hidden"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
