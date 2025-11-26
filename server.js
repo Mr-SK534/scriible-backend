@@ -105,8 +105,13 @@ io.on('connection', (socket) => {
 
       player.score += guesserPoints;
       if (room.currentDrawer) room.players[room.currentDrawer].score += drawerBonus;
-
+      
       const drawerName = room.currentDrawer ? room.players[room.currentDrawer].name : "Drawer";
+
+      io.to(room.code).emit('message', {
+        user: 'System',
+        text: `<strong style="color:#FFD700">${player.name}</strong> guessed it! → +${guesserPoints} pts | <strong style="color:#4CAF50">${drawerName}</strong> +${drawerBonus} pts`
+      });
 
       socket.emit('message', { user: 'System', text: `Correct! +${guesserPoints} pts` });
       if (room.currentDrawer) io.to(room.currentDrawer).emit('message', { user: 'System', text: `+${drawerBonus} pts!` });
