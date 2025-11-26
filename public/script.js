@@ -1,5 +1,4 @@
-// public/script.js — FINAL VERSION WITH COLOR PALETTE + FULL GAME LOGIC
-
+// public/script.js — FINAL & 100% WORKING — ROUND SELECTION NOW WORKS!
 const BACKEND_URL = 'https://scriible-backend.onrender.com';
 const socket = io(BACKEND_URL, {
   transports: ['websocket','polling'],
@@ -53,10 +52,7 @@ PALETTE_COLORS.forEach(c => {
   swatch.onclick = () => {
     selectedColor = c;
     document.getElementById("colorPicker").value = c;
-
-    document.querySelectorAll(".palette-swatch")
-      .forEach(x => x.classList.remove("selected"));
-
+    document.querySelectorAll(".palette-swatch").forEach(x => x.classList.remove("selected"));
     swatch.classList.add("selected");
     colorNameDisplay.textContent = "Color: " + PALETTE_NAMES[c];
   };
@@ -64,7 +60,6 @@ PALETTE_COLORS.forEach(c => {
   paletteDiv.appendChild(swatch);
 });
 
-// Default selected swatch
 paletteDiv.children[0].classList.add("selected");
 colorNameDisplay.textContent = "Color: Black";
 
@@ -85,7 +80,6 @@ function resizeCanvas() {
 
 window.addEventListener("load", resizeCanvas);
 window.addEventListener("resize", resizeCanvas);
-
 setTimeout(resizeCanvas, 100);
 
 // ================= DRAWING =================
@@ -114,7 +108,6 @@ function drawLine(x0,y0,x1,y1,color,size,emit=true){
   ctx.lineWidth = size;
   ctx.stroke();
   ctx.closePath();
-
   if (emit) socket.emit("draw", {x0,y0,x1,y1,color,size});
 }
 
@@ -139,20 +132,16 @@ function drawLine(x0,y0,x1,y1,color,size,emit=true){
   canvas.addEventListener(ev, () => drawing = false)
 );
 
-// Brush size
-document.getElementById("brushSize")
-  .addEventListener("input", e => ctx.lineWidth = e.target.value);
+document.getElementById("brushSize").addEventListener("input", e => ctx.lineWidth = e.target.value);
 
-// Clear canvas
-document.getElementById("clearBtn")
-  .addEventListener("click", () => {
-    if (confirm("Clear canvas?")) {
-      ctx.clearRect(0,0,LOGICAL_WIDTH,LOGICAL_HEIGHT);
-      socket.emit("clearCanvas");
-    }
-  });
+document.getElementById("clearBtn").addEventListener("click", () => {
+  if (confirm("Clear canvas?")) {
+    ctx.clearRect(0,0,LOGICAL_WIDTH,LOGICAL_HEIGHT);
+    socket.emit("clearCanvas");
+  }
+});
 
-// ================= ROOM UI =================
+// ================= ROOM UI — FIXED: Now sends number of rounds =================
 function startGame() {
   document.getElementById("menu").classList.add("hidden");
   document.getElementById("game").classList.remove("hidden");
@@ -161,9 +150,13 @@ function startGame() {
 
 window.createRoom = function() {
   const name = document.getElementById("username").value.trim() || "Player";
+  const roundsInput = document.getElementById("numRounds").value.trim();
+  const rounds = Math.max(3, Math.min(20, parseInt(roundsInput) || 6));  // ← Read from input
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   document.getElementById("roomCode").value = code;
-  socket.emit("createRoom", code, name);
+
+  // FIXED: Send the actual number of rounds to server!
+  socket.emit("createRoom", code, name, rounds);
 };
 
 window.joinRoom = function() {
@@ -268,10 +261,7 @@ socket.on("clearCanvas",()=>{
 socket.on("message",m=>addMessage(m.user,m.text));
 
 socket.on("correctGuess",(name,pts,bonus)=>{
-  addMessage(
-    "System",
-    `<strong style="color:#FFD700">${name}</strong> guessed it! +${pts} pts • Drawer +${bonus} pts`
-  );
+  addMessage("System",`<strong style="color:#FFD700">${name}</strong> guessed it! +${pts} pts • Drawer +${bonus} pts`);
 });
 
 socket.on("wordReveal",w=>{
