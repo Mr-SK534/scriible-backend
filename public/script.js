@@ -2,18 +2,27 @@ const BACKEND_URL = 'https://scriible-backend.onrender.com';
 const socket = io(BACKEND_URL, { transports: ['websocket'] });
 
 const PALETTE_COLORS = [
-  "#000000", "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4",
-  "#46f0f0", "#f032e6", "#bcf60c", "#fabebe", "#008080", "#e6beff", "#9a6324",
-  "#fffac8", "#800000", "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080", "#ffffff"
+  "#000000","#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4",
+  "#46f0f0","#f032e6","#bcf60c","#fabebe","#008080","#e6beff","#9a6324",
+  "#fffac8","#800000","#aaffc3","#808000","#ffd8b1","#000075","#808080","#ffffff"
 ];
-const PALETTE_NAMES = {/* ... names mapping as before ...*/};
+
+const PALETTE_NAMES = {
+  "#000000": "Black", "#e6194b": "Red", "#3cb44b": "Green", "#ffe119": "Yellow",
+  "#4363d8": "Blue", "#f58231": "Orange", "#911eb4": "Purple", "#46f0f0": "Cyan",
+  "#f032e6": "Magenta", "#bcf60c": "Lime", "#fabebe": "Pink", "#008080": "Teal",
+  "#e6beff": "Lavender", "#9a6324": "Brown", "#fffac8": "Beige", "#800000": "Maroon",
+  "#aaffc3": "Mint", "#808000": "Olive", "#ffd8b1": "Peach", "#000075": "Navy",
+  "#808080": "Gray", "#ffffff": "White"
+};
+
 let selectedColor = "#000000";
 let drawing = false;
 let lastX = 0, lastY = 0;
 let roomCode = null;
 let currentMaxRounds = 6;
 
-// Canvas setup
+// Canvas
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const LOGICAL_WIDTH = 800;
@@ -24,7 +33,7 @@ ctx.lineCap = 'round';
 ctx.lineJoin = 'round';
 ctx.lineWidth = 5;
 
-// Responsive canvas
+// Responsive
 function resizeCanvas() {
   const container = canvas.parentElement;
   const ratio = Math.min(container.clientWidth / LOGICAL_WIDTH, (window.innerHeight * 0.65) / LOGICAL_HEIGHT);
@@ -35,7 +44,6 @@ window.addEventListener('load', resizeCanvas);
 window.addEventListener('resize', resizeCanvas);
 setTimeout(resizeCanvas, 100);
 
-// Drawing support
 function getCoordinates(e) {
   const rect = canvas.getBoundingClientRect();
   const scaleX = LOGICAL_WIDTH / rect.width;
@@ -44,6 +52,7 @@ function getCoordinates(e) {
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
   return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
 }
+
 function drawLine(x0, y0, x1, y1, color, size, emit = true) {
   ctx.beginPath();
   ctx.moveTo(x0, y0);
@@ -53,6 +62,8 @@ function drawLine(x0, y0, x1, y1, color, size, emit = true) {
   ctx.stroke();
   if (emit) socket.emit('draw', { x0, y0, x1, y1, color, size });
 }
+
+// Touch & Mouse
 ['mousedown', 'touchstart'].forEach(ev => canvas.addEventListener(ev, e => {
   e.preventDefault(); drawing = true; const p = getCoordinates(e); lastX = p.x; lastY = p.y;
 }));
@@ -63,14 +74,15 @@ function drawLine(x0, y0, x1, y1, color, size, emit = true) {
   drawLine(lastX, lastY, p.x, p.y, selectedColor, ctx.lineWidth);
   lastX = p.x; lastY = p.y;
 }));
-['mouseup', 'mouseout', 'touchend', 'touchcancel'].forEach(ev => canvas.addEventListener(ev, () => { drawing = false; }));
+['mouseup', 'mouseout', 'touchend', 'touchcancel'].forEach(ev => canvas.addEventListener(ev, () => drawing = false));
 
-// UI
+// UI Functions
 function startGame() {
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
   resizeCanvas();
 }
+
 function createRoom() {
   const name = document.getElementById('username').value.trim() || 'Player';
   const rounds = Math.max(3, Math.min(20, parseInt(document.getElementById('numRounds').value) || 6));
@@ -78,6 +90,7 @@ function createRoom() {
   document.getElementById('roomCode').value = code;
   socket.emit('createRoom', code, name, rounds);
 }
+
 function joinRoom() {
   const name = document.getElementById('username').value.trim() || 'Player';
   const code = document.getElementById('roomCode').value.trim().toUpperCase();
@@ -87,7 +100,7 @@ function joinRoom() {
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 
-// Palette
+// Color Palette
 const paletteDiv = document.getElementById('colorPalette');
 PALETTE_COLORS.forEach(c => {
   const s = document.createElement('div');
@@ -114,18 +127,23 @@ document.getElementById('clearBtn').onclick = () => {
   }
 };
 
-// Player list UI
+// Player List — NOW SORTED + SHOWS (you)
 function updatePlayers(players) {
   const container = document.getElementById('players');
-  container.innerHTML = '';
-  players.forEach(p => {
-    const div = document.createElement('div');
-    div.textContent = `${p.name} — ${p.score} pts`;
-    container.appendChild(div);
-  });
+  container.innerHTML = '<h3 style="color:#FFA447;margin:0 0 8px 0;">Players</h3>';
+  
+  Object.values(players)
+    .sort((a, b) => b.score - a.score)
+    .forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'player';
+      div.textContent = `${p.name}${p.id === socket.id ? ' (you)' : ''} → ${p.score} pts`;
+      if (p.id === socket.id) div.style.fontWeight = 'bold';
+      container.appendChild(div);
+    });
 }
 
-// ===== SOCKET EVENTS =====
+// Socket Events
 socket.on('roomJoined', (code, players, maxRounds) => {
   currentMaxRounds = maxRounds;
   roomCode = code;
@@ -134,12 +152,15 @@ socket.on('roomJoined', (code, players, maxRounds) => {
   startGame();
   updatePlayers(players);
 });
+
 socket.on('updatePlayers', players => updatePlayers(players));
+
 socket.on('newRound', (round, maxRounds, drawerId, drawerName) => {
   document.getElementById('roundInfo').textContent = `Round ${round}/${maxRounds}`;
   addMessage('System', `${drawerName} is drawing!`);
   if (socket.id === drawerId) document.getElementById('wordChoices').classList.remove('hidden');
 });
+
 socket.on('yourTurn', choices => {
   const d = document.getElementById('wordChoices');
   d.innerHTML = '';
@@ -150,24 +171,14 @@ socket.on('yourTurn', choices => {
     d.appendChild(b);
   });
 });
+
 socket.on('wordHint', h => document.getElementById('wordHint').textContent = h);
 socket.on('timer', t => document.getElementById('timer').textContent = t);
 socket.on('clearCanvas', () => ctx.clearRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT));
 socket.on('draw', d => drawLine(d.x0, d.y0, d.x1, d.y1, d.color, d.size, false));
 
-// Chat + system messages
-socket.on('message', m => {
-  addMessage(m.user, m.text);
-  if (m.user === 'System' && m.text && m.text.startsWith('Auto-selected:')) {
-    alert(m.text);
-  }
-  if (m.user === 'Private' && m.text && m.text.startsWith('Your word:')) {
-    alert(m.text);
-  }
-});
-socket.on('correctGuess', (name, pts) => {
-  addMessage('System', `${name} guessed it! (+${pts} pts)`);
-});
+socket.on('message', m => addMessage(m.user, m.text));
+socket.on('correctGuess', (name, pts) => addMessage('System', `${name} guessed it! (+${pts} pts)`));
 socket.on('wordReveal', w => addMessage('System', `Word was: ${w}`));
 socket.on('gameOver', lb => {
   let txt = 'Game Over!\n\n';
@@ -175,7 +186,7 @@ socket.on('gameOver', lb => {
   alert(txt);
 });
 
-// Chat input
+// Chat
 function sendChat() {
   const input = document.getElementById('chatInput');
   if (input.value.trim()) {
@@ -186,7 +197,6 @@ function sendChat() {
 document.getElementById('chatInput').addEventListener('keydown', e => e.key === 'Enter' && sendChat());
 document.getElementById('chatSendBtn').onclick = sendChat;
 
-// Chat message UI
 function addMessage(user, text) {
   const div = document.createElement('div');
   div.innerHTML = `<strong>${user}:</strong> ${text}`;
