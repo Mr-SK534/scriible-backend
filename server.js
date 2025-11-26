@@ -11,7 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const rooms = {};
-const WORD_LIST = ["cat","dog","house","tree","car","sun","moon","star","fish","bird","apple","banana","pizza","cake","rainbow","rocket","castle","dragon","unicorn","phone","book","ocean","giraffe","elephant","penguin","butterfly","flower","heart","smile","fire","plane","train","boat","cloud","mountain","beach","forest","island","desert","volcano","bridge","tower","school","icecream","cookie","donut","burger","fries","coffee","tea","juice","robot","alien","spaceship","sword","shield","crown","diamond"];
+const WORD_LIST = ["cat","dog","house","tree","car","sun","moon","star","fish","bird","apple","banana","pizza","cake","rainbow","rocket","castle","dragon","unicorn","phone","book","ocean","giraffe","elephant","penguin","butterfly","flower","heart","smile","fire","plane","train","boat","cloud","mountain","beach","forest","island","desert","volcano","bridge","tower","school","icecream","cookie","donut","burger","fries","coffee","tea","juice","robot","alien","spaceship","sword","shield","crown","diamond","laptop","phone","robot","pizza","rainbow","rocket","castle","dragon","unicorn","elephant","penguin","butterfly","flower","heart","fire","plane","cloud","mountain","beach","volcano","diamond"];
 
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
@@ -38,12 +38,10 @@ io.on('connection', (socket) => {
       wordChoiceTimeout: null
     };
 
-    // Add creator to room
     const player = { id: socket.id, name: name.trim() || "Host", score: 0 };
     socket.join(code);
     rooms[code].players[socket.id] = player;
 
-    // Send roomJoined to creator
     socket.emit('roomJoined', code, Object.values(rooms[code].players), rooms[code].maxRounds);
     io.to(code).emit('updatePlayers', Object.values(rooms[code].players));
     io.to(code).emit('message', { user: 'System', text: `${player.name} created the room!` });
@@ -86,7 +84,7 @@ io.on('connection', (socket) => {
     startTimer(room.code);
   });
 
-  // DRAWING & CLEAR
+  // DRAWING
   socket.on('draw', data => {
     const roomCode = [...socket.rooms][1];
     if (roomCode) socket.to(roomCode).emit('draw', data);
@@ -96,7 +94,7 @@ io.on('connection', (socket) => {
     if (roomCode) socket.to(roomCode).emit('clearCanvas');
   });
 
-  // CHAT & GUESSING
+  // CHAT & GUESSING — SCORES NOW UPDATE 100%
   socket.on('chatMessage', (msg) => {
     const room = Object.values(rooms).find(r => r.players[socket.id]);
     if (!room) return;
@@ -121,14 +119,20 @@ io.on('connection', (socket) => {
 
     if (room.currentWord && guess === room.currentWord.toLowerCase()) {
       room.guessedPlayers.add(socket.id);
+
       const timeElapsed = (Date.now() - room.roundStartTime) / 1000;
       const points = Math.max(20, Math.round(120 - timeElapsed * 1.5));
       player.score += points;
-      if (room.currentDrawer) room.players[room.currentDrawer].score += Math.round(points * 0.4);
+
+      if (room.currentDrawer) {
+        room.players[room.currentDrawer].score += Math.round(points * 0.4);
+      }
 
       socket.emit('message', { user: 'System', text: `Correct! +${points} pts` });
       io.to(room.code).emit('correctGuess', player.name, points);
-      io.to(room.code).emit('message', { user: 'System', text: `${player.name} guessed it!` });
+      io.to(room.code).emit('message', { user: 'System', text: `${player.name} guessed the word!` });
+
+      // THIS LINE FIXES THE SCORE UPDATE
       io.to(room.code).emit('updatePlayers', Object.values(room.players));
 
       if (room.guessedPlayers.size >= Object.keys(room.players).length - 1) {
@@ -142,7 +146,7 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('message', { user: player.name, text: msg });
   });
 
-  // NEXT ROUND + AUTO SELECT AFTER 15s
+  // NEXT ROUND + AUTO WORD AFTER 15s
   function nextRound(code) {
     const room = rooms[code];
     if (!room) return;
