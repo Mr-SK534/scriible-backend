@@ -1,250 +1,342 @@
-// server.js — FULLY FIXED & STABLE FOR RENDER
+// server.js — Merged, fixed, production-safe
+// Behavior: word revealed ONLY on timer. Drawer receives bonus on correct guesses.
 
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
 const path = require('path');
+const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
+
+const io = new Server(server, {
   cors: { origin: "*" },
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+// ==================== GAME STATE ====================
 const rooms = {};
-const WORD_LIST = [
-  "cat","dog","house","tree","car","sun","moon","star","fish","bird",
-  "apple","banana","pizza","cake","rainbow","rocket","castle","dragon",
-  "unicorn","phone","book","ocean","giraffe","elephant","penguin",
-  "butterfly","flower","heart","smile","fire","plane","train","boat",
-  "cloud","mountain","beach","forest","island","desert","volcano",
-  "bridge","tower","school","icecream","cookie","donut","burger","fries",
-  "coffee","tea","juice","robot","alien","spaceship","sword","shield",
-  "crown","diamond"
+const MAX_ROUNDS = 6;
+const ROUND_TIME = 80;
+
+const wordList = [
+  "cat", "dog", "house", "tree", "car", "sun", "moon", "star", "fish", "bird",
+  "apple", "banana", "pizza", "cake", "rainbow", "rocket", "castle", "dragon",
+  "unicorn", "computer", "phone", "book", "mountain", "ocean", "giraffe",
+  "elephant", "penguin", "butterfly", "flower", "heart", "smile", "fire"
 ];
 
-// 🔥 UNIVERSAL ROOM DETECTOR — WORKS 100%
-function getRoomCode(socket) {
+// -------------------- Helpers --------------------
+function getRoomCodeFromSocket(socket) {
+  // Works whether socket.rooms contains [socket.id, roomCode] or [roomCode] or different ordering
   return Array.from(socket.rooms).find(r => rooms[r]);
 }
 
+function findRoomByPlayerId(playerId) {
+  return Object.values(rooms).find(r => r.players && r.players[playerId]);
+}
+
+function sendPlayersUpdate(code) {
+  if (!rooms[code]) return;
+  // send array of players sorted by score desc
+  const arr = Object.values(rooms[code].players).sort((a,b) => b.score - a.score);
+  io.to(code).emit('updatePlayers', arr);
+}
+
+function getRandomWords(n) {
+  const shuffled = [...wordList].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, n);
+}
+
+// -------------------- Socket Logic --------------------
 io.on('connection', (socket) => {
-  console.log('Connected:', socket.id);
+  console.log('Player connected:', socket.id);
 
-  socket.on('createRoom', (code, name, numRounds = 6) => {
+  // Create room
+  socket.on('createRoom', (code, name = 'Host') => {
+    if (!code) return socket.emit('roomError', 'Invalid code');
     code = code.toUpperCase();
-    if (rooms[code]) return socket.emit('errorMsg', 'Room exists!');
-    numRounds = Math.max(3, Math.min(20, parseInt(numRounds))) || 6;
-
+    if (rooms[code]) return socket.emit('roomError', 'Room exists');
     rooms[code] = {
-      code, players: {}, round: 0, maxRounds: numRounds,
-      drawerIndex: 0, currentWord: null, currentDrawer: null,
-      gameStarted: false, timer: null, roundStartTime: null,
-      guessedPlayers: new Set(), wordChoiceTimeout: null
+      code,
+      players: {},
+      round: 1,
+      drawerIndex: 0,
+      currentWord: null,
+      currentDrawer: null,
+      gameStarted: false,
+      timer: null,
+      roundStartTime: null,
+      guessedPlayers: new Set()
     };
-
-    joinPlayer(socket, code, name.trim() || "Host");
+    joinPlayerToRoom(socket, code, name);
   });
 
-  socket.on('joinRoom', (code, name) => {
+  // Join room
+  socket.on('joinRoom', (code, name = 'Guest') => {
+    if (!code) return socket.emit('invalidCode');
     code = code.toUpperCase();
-    if (!rooms[code]) return socket.emit('errorMsg', 'Room not found');
-    if (Object.keys(rooms[code].players).length >= 12)
-      return socket.emit('errorMsg', 'Room full');
-
-    joinPlayer(socket, code, name.trim() || "Guest");
+    if (!rooms[code]) return socket.emit('invalidCode');
+    if (Object.keys(rooms[code].players).length >= 10) return socket.emit('roomFull');
+    joinPlayerToRoom(socket, code, name);
   });
 
-  // ⭐ PLAYER JOIN
-  function joinPlayer(socket, code, name) {
+  function joinPlayerToRoom(socket, code, name) {
     socket.join(code);
-    rooms[code].players[socket.id] = { id: socket.id, name, score: 0 };
+    const player = { id: socket.id, name: (name || 'Guest').trim(), score: 0 };
+    rooms[code].players[socket.id] = player;
 
-    socket.emit('roomJoined', code, Object.values(rooms[code].players), rooms[code].maxRounds);
-    io.to(code).emit('updatePlayers', Object.values(rooms[code].players));
-    io.to(code).emit('message', { user: 'System', text: `${name} joined!` });
+    // send array for compatibility with front-end
+    socket.emit('roomJoined', code, Object.values(rooms[code].players).sort((a,b)=>b.score-a.score), MAX_ROUNDS);
+    sendPlayersUpdate(code);
+    io.to(code).emit('message', { user: 'System', text: `${player.name} joined!` });
 
+    // Auto-start when >= 2 players
     if (Object.keys(rooms[code].players).length >= 2 && !rooms[code].gameStarted) {
       rooms[code].gameStarted = true;
       setTimeout(() => nextRound(code), 3000);
     }
   }
 
-  // ⭐ WORD CHOICE
+  // Drawer chooses a word
   socket.on('chooseWord', (word) => {
-    const room = Object.values(rooms).find(r => r.currentDrawer === socket.id);
-    if (!room || !word) return;
-
-    clearTimeout(room.wordChoiceTimeout);
+    const room = findRoomByPlayerId(socket.id);
+    if (!room) return;
+    if (room.currentDrawer !== socket.id) return;
 
     room.currentWord = word;
     room.guessedPlayers = new Set();
     room.roundStartTime = Date.now();
 
-    socket.emit('message', { user: 'You', text: `Your word: <strong style="color:#4CAF50;font-size:18px">${word}</strong>` });
-
-    const hint = word.split('').map((c,i) => i % 2 === 0 ? c : "_").join(" ");
+    // hint with every second char hidden
+    const hint = room.currentWord.split('').map((c,i)=> i%2===0 ? c : '_').join(' ');
     io.to(room.code).emit('wordHint', hint);
-    io.to(room.code).emit('message', { user: 'System', text: 'Word chosen! Start guessing!' });
+    socket.emit('message', { user: 'Private', text: `Your word: ${room.currentWord}` });
 
+    // start timer for this round
     startTimer(room.code);
   });
 
-  // 🎨 DRAW FIXED BROADCAST
-  socket.on('draw', data => {
-    const roomCode = getRoomCode(socket);
+  // drawing broadcast
+  socket.on('draw', (data) => {
+    const roomCode = getRoomCodeFromSocket(socket);
     if (roomCode) socket.to(roomCode).emit('draw', data);
   });
 
-  // 🧹 CLEAR CANVAS FIXED
   socket.on('clearCanvas', () => {
-    const roomCode = getRoomCode(socket);
+    const roomCode = getRoomCodeFromSocket(socket);
     if (roomCode) socket.to(roomCode).emit('clearCanvas');
   });
 
-  // 💬 CHAT + GUESSING + SCORING — FIXED
+  // Chat & guessing
   socket.on('chatMessage', (msg) => {
-    const roomCode = getRoomCode(socket);
-    const room = rooms[roomCode];
+    if (!msg) return;
+    const room = findRoomByPlayerId(socket.id);
     if (!room || !room.currentWord) return;
 
     const player = room.players[socket.id];
-    const guess = msg.trim().toLowerCase();
+    const guessRaw = msg.trim();
+    if (!player) return;
 
+    // Drawer sending chat
     if (socket.id === room.currentDrawer) {
-      io.to(roomCode).emit('message', { user: player.name, text: msg });
+      io.to(room.code).emit('message', { user: player.name, text: guessRaw });
       return;
     }
 
-    if (room.guessedPlayers.has(socket.id)) return;
-
-    if (guess.length > 2 && room.currentWord.toLowerCase().includes(guess)) {
-      socket.emit('errorMsg', 'Too close!');
+    // already guessed this round
+    if (room.guessedPlayers.has(socket.id)) {
+      socket.emit('message', { user: 'System', text: 'You already guessed it!' });
       return;
     }
 
-    if (guess === room.currentWord.toLowerCase()) {
+    const guess = guessRaw.toLowerCase();
+    const target = room.currentWord.toLowerCase();
+
+    // too close (substring) check
+    if (guess.length > 2 && target.includes(guess) && guess !== target) {
+      socket.emit('message', { user: 'System', text: 'Too close!' });
+      return;
+    }
+
+    // correct guess (award points, but DO NOT reveal the word — reveal only on timer)
+    if (guess === target) {
       room.guessedPlayers.add(socket.id);
 
-      const timeElapsed = (Date.now() - room.roundStartTime) / 1000;
+      const timeElapsed = Math.floor((Date.now() - room.roundStartTime) / 1000);
+      // scoring formula — ensures a minimum and scales with speed
       const guesserPoints = Math.max(20, Math.round(120 - timeElapsed * 1.5));
       const drawerBonus = Math.round(guesserPoints * 0.4);
 
+      // update scores
       player.score += guesserPoints;
-      if (room.currentDrawer)
+      if (room.currentDrawer && room.players[room.currentDrawer]) {
         room.players[room.currentDrawer].score += drawerBonus;
+      }
 
-      const drawerName = room.players[room.currentDrawer].name;
-
-      io.to(roomCode).emit('message', {
+      // notify everyone that someone guessed correctly (without revealing the word)
+      io.to(room.code).emit('message', {
         user: 'System',
-        text: `<strong style="color:#FFD700">${player.name}</strong> guessed it! → +${guesserPoints} pts | <strong style="color:#4CAF50">${drawerName}</strong> +${drawerBonus} pts`
+        text: `<strong style="color:#FFD700">${player.name}</strong> guessed it! +${guesserPoints} pts • Drawer +${drawerBonus} pts`
       });
 
-      // 🔥 SCORE UPDATE FIX
-      io.to(roomCode).emit('updatePlayers', Object.values(room.players));
+      // private confirmation to guesser
+      socket.emit('message', { user: 'System', text: `Correct! +${guesserPoints} pts` });
 
-      if (room.guessedPlayers.size >= Object.keys(room.players).length - 1) {
-        clearInterval(room.timer);
-        io.to(roomCode).emit('wordReveal', room.currentWord);
-        setTimeout(() => nextRound(roomCode), 4000);
+      // send a dedicated event if front-end wants special handling
+      io.to(room.code).emit('correctGuess', player.name, guesserPoints, drawerBonus);
+
+      // MUST update players for everybody
+      sendPlayersUpdate(room.code);
+
+      // if everyone except drawer guessed, end round early WITHOUT revealing the word
+      const totalGuessers = Object.keys(room.players).length - 1;
+      if (room.guessedPlayers.size >= totalGuessers) {
+        // stop timer and proceed to next round without revealing the word
+        if (room.timer) {
+          clearInterval(room.timer);
+          room.timer = null;
+        }
+        io.to(room.code).emit('message', { user: 'System', text: 'All players guessed — proceeding to next round.' });
+        // small delay for UX
+        setTimeout(() => nextRound(room.code), 3000);
       }
+
       return;
     }
 
-    io.to(roomCode).emit('message', { user: player.name, text: msg });
+    // normal chat broadcast
+    io.to(room.code).emit('message', { user: player.name, text: guessRaw });
   });
 
-  // ⭐ NEXT ROUND
+  // Next round logic
   function nextRound(code) {
     const room = rooms[code];
     if (!room) return;
 
-    room.round++;
-    if (room.round > room.maxRounds) return endGame(code);
+    // end game if beyond max rounds
+    if (room.round > MAX_ROUNDS) {
+      endGame(code);
+      return;
+    }
 
-    const ids = Object.keys(room.players);
-    room.currentDrawer = ids[room.drawerIndex % ids.length];
+    const playerIds = Object.keys(room.players);
+    if (playerIds.length === 0) return;
+
+    // choose drawer
+    const drawerId = playerIds[room.drawerIndex % playerIds.length];
+    room.currentDrawer = drawerId;
     room.currentWord = null;
     room.guessedPlayers = new Set();
+    room.roundStartTime = null;
 
-    io.to(code).emit('newRound', room.round, room.maxRounds, room.currentDrawer, room.players[room.currentDrawer].name);
+    const drawerName = room.players[drawerId].name;
+
+    // notify clients
+    io.to(code).emit('newRound', room.round, MAX_ROUNDS, drawerId, drawerName);
     io.to(code).emit('clearCanvas');
     io.to(code).emit('wordHint', 'Waiting...');
 
-    const choices = WORD_LIST.sort(() => 0.5 - Math.random()).slice(0, 3);
-    io.to(room.currentDrawer).emit('yourTurn', choices);
+    // pick choices for drawer
+    const choices = getRandomWords(3);
+    io.to(drawerId).emit('yourTurn', choices);
 
+    // if drawer doesn't pick, auto choose after 15s
+    room.wordChoiceTimeout && clearTimeout(room.wordChoiceTimeout);
     room.wordChoiceTimeout = setTimeout(() => {
       if (!room.currentWord) {
-        room.currentWord = choices[0];
-        room.roundStartTime = Date.now();
-
-        io.to(room.currentDrawer).emit('message', { user: 'You', text: `Auto-selected: <strong style="color:#FF9800">${room.currentWord}</strong>` });
-        io.to(code).emit('message', { user: 'System', text: 'Word auto-selected!' });
-
-        const hint = room.currentWord.split('').map((c,i) => i%2===0?c:'_').join(' ');
+        const autoWord = choices[0];
+        room.currentWord = autoWord;
+        const hint = autoWord.split('').map((c,i) => i%2===0 ? c : '_').join(' ');
         io.to(code).emit('wordHint', hint);
+        io.to(drawerId).emit('autoChooseWord', autoWord);
+        io.to(drawerId).emit('message', { user: 'Private', text: `Auto-selected: ${autoWord}` });
 
+        // start timer once auto selected
         startTimer(code);
       }
     }, 15000);
 
     room.drawerIndex++;
+    room.round++;
   }
 
-  // ⭐ TIMER
+  // Timer logic — reveal word only when timer finishes
   function startTimer(code) {
     const room = rooms[code];
-    let time = 80;
+    if (!room) return;
+    room.roundStartTime = Date.now();
 
-    clearInterval(room.timer);
+    let timeLeft = ROUND_TIME;
+    if (room.timer) clearInterval(room.timer);
     room.timer = setInterval(() => {
-      io.to(code).emit('timer', time--);
+      io.to(code).emit('timer', timeLeft);
+      timeLeft--;
 
-      if (time < 0) {
+      if (timeLeft < 0) {
         clearInterval(room.timer);
-        io.to(code).emit('wordReveal', room.currentWord || "None");
+        room.timer = null;
+        // reveal the word to everyone only when timer ends
+        io.to(code).emit('wordReveal', room.currentWord || 'None');
+        io.to(code).emit('message', { user: 'System', text: `Time's up! Word was: ${room.currentWord || 'none'}` });
+
+        // small delay then next round
         setTimeout(() => nextRound(code), 5000);
       }
     }, 1000);
   }
 
-  // ⭐ END GAME
+  // End game
   function endGame(code) {
     const room = rooms[code];
     if (!room) return;
 
-    const lb = Object.values(room.players)
-      .sort((a,b)=>b.score-a.score)
-      .map((p,i)=>({rank:i+1,name:p.name,score:p.score}));
+    const leaderboard = Object.values(room.players)
+      .sort((a,b) => b.score - a.score)
+      .map((p, i) => ({ rank: i+1, name: p.name, score: p.score }));
 
-    io.to(code).emit('gameOver', lb);
+    io.to(code).emit('gameOver', leaderboard);
+
+    // cleanup
+    if (room.timer) {
+      clearInterval(room.timer);
+      room.timer = null;
+    }
     delete rooms[code];
   }
 
-  // ⭐ DISCONNECT
+  // Disconnect handling
   socket.on('disconnect', () => {
-    const roomCode = getRoomCode(socket);
-    const room = rooms[roomCode];
-    if (!room) return;
+    // find room(s) which include this player
+    for (const code in rooms) {
+      if (rooms[code].players[socket.id]) {
+        const name = rooms[code].players[socket.id].name;
+        delete rooms[code].players[socket.id];
 
-    const name = room.players[socket.id]?.name;
-    delete room.players[socket.id];
+        // notify
+        sendPlayersUpdate(code);
+        io.to(code).emit('message', { user: 'System', text: `${name} left` });
 
-    io.to(roomCode).emit('updatePlayers', Object.values(room.players));
-    io.to(roomCode).emit('message', { user: 'System', text: `${name} left` });
-
-    if (Object.keys(room.players).length === 0)
-      delete rooms[roomCode];
+        // if empty room then cleanup
+        if (Object.keys(rooms[code].players).length === 0) {
+          if (rooms[code].timer) { clearInterval(rooms[code].timer); rooms[code].timer = null; }
+          delete rooms[code];
+        } else if (rooms[code].currentDrawer === socket.id) {
+          // if drawer disconnected: stop timer and start next round
+          if (rooms[code].timer) { clearInterval(rooms[code].timer); rooms[code].timer = null; }
+          setTimeout(() => nextRound(code), 3000);
+        }
+        break;
+      }
+    }
   });
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, "0.0.0.0", () =>
-  console.log(`Server running on port ${PORT}`)
-);
+server.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
