@@ -187,3 +187,7 @@ function addMessage(user, text) {
 }
 
 socket.on('errorMsg', msg => document.getElementById('error').textContent = msg);
+
+socket.on('connect', () => console.log('Connected to server!'));
+socket.on('disconnect', () => console.log('Disconnected — retrying...'));
+socket.on('connect_error', (err) => console.log('Connection error:', err.message));
