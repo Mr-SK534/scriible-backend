@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Skribbl Clone – Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1 style="color:#FFA447;font-size:2em;margin-bottom:8px;">Draw & Guess Game</h1>
+  </header>
+
+  <div id="menu">
+    <input id="username" type="text" placeholder="Enter your name" maxlength="16">
+    <input id="roomCode" type="text" placeholder="Room code (6 letters)" maxlength="6" style="text-transform:uppercase">
+    <button onclick="createRoom()">Create Room</button>
+    <button onclick="joinRoom()">Join Room</button>
+    <div id="error"></div>
+  </div>
+
+  <div id="game" class="hidden">
+    <div id="topBar" style="background:#333;">
+      <div id="roomDisplay" style="color:#FFA447;font-weight:bold;">Room:</div>
+      <div id="roundInfo" style="color:#fff;"></div>
+      <div id="timer" style="color:#FFA447;"></div>
+    </div>
+    <div id="main">
+      <!-- Chat panel for game guesses -->
+      <div id="chatPanel">
+        <h3 style="color:#00B4D8;margin-bottom:8px;">Guess Chat</h3>
+        <div id="chat">
+          <div id="messages"></div>
+        </div>
+        <div id="chatInputRow">
+          <input type="text" id="chatInput" placeholder="Type guess or message..." maxlength="100">
+          <button id="chatSendBtn" type="button">Send</button>
+        </div>
+      </div>
+      <!-- Drawing canvas -->
+      <canvas id="canvas" width="800" height="500"></canvas>
+      <!-- Sidebar with palette, players, word hint, choices -->
+      <div id="sidebar">
+        <div id="players" style="margin-bottom:17px;text-align:left;"></div>
+        <div id="wordHint"></div>
+        <div id="wordChoices" class="hidden"></div>
+        <div id="colorPalette" style="margin:12px 0;"></div>
+        <input type="color" id="colorPicker" value="#000000" style="margin-bottom:8px;">
+        <div id="colorNameDisplay"></div>
+        <label for="brushSize" style="display:block;margin-top:10px;">Brush Size:</label>
+        <input type="range" id="brushSize" min="2" max="36" step="1" value="5" style="width:80%;">
+        <button id="clearBtn" style="display:block;margin:14px 0 8px 0;">Clear Canvas</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

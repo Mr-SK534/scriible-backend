@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skribbl Clone – Rules</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { text-align: center; background: #222; color: #fff; }
+    .rules-container {
+      max-width: 600px;
+      margin: 35px auto 0;
+      background: #242f3f;
+      border-radius: 18px;
+      padding: 24px 18px 30px;
+      box-shadow: 0 4px 24px #1016;
+    }
+    h1 { margin-bottom: 0.7em; color: #FFA447; }
+    ol { text-align: left; margin: 0 0 1em 1.5em; }
+    .play-btn {
+      margin-top: 30px;
+      font-size: 1.3em;
+      padding: 18px 42px;
+      border-radius: 1.2em;
+      background: linear-gradient(90deg, #FFA447, #00B4D8);
+      color: #222;
+      border: none;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .16s;
+    }
+    .play-btn:hover { background: #00B4D8; color: #fff; }
+    @media (max-width: 600px) {
+      .rules-container { padding: 13vw 3vw 10vw; font-size: 1.1em; }
+      h1 { font-size: 2em; }
+      .play-btn { padding: 12px 18px; width: 95%; font-size:1.14em;}
+    }
+  </style>
+</head>
+<body>
+  <div class="rules-container">
+    <h1>How To Play</h1>
+    <ol>
+      <li>Enter a room or create one with a unique code. Share with friends!</li>
+      <li>One player draws a word. Others guess via chat. Fastest guess = more points.</li>
+      <li>No typing the exact word as hints in your drawing.</li>
+      <li>Be respectful: no spam, foul language, or revealing answers outside the game.</li>
+      <li>Six rounds per game. At the end, see who’s the top guesser and artist!</li>
+    </ol>
+    <button class="play-btn" onclick="window.location.href='game.html'">Play</button>
+  </div>
+</body>
+</html>
