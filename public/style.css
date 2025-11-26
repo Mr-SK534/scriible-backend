@@ -8,6 +8,7 @@
 body { 
   background: #273043; 
   color: #fff; 
+  min-height: 100vh;
 }
 
 header, #menu, #game { 
@@ -23,27 +24,10 @@ header {
   padding: 16px 0;
 }
 
-#rules { 
-  margin: 10px auto 0; 
-  background: #273043; 
-  border-radius: 10px; 
-  padding: 10px 16px; 
-  max-width: 700px; 
-  box-shadow: 0 2px 8px #1128; 
-}
-#rules h2, #rules h3 { 
-  color: #FFA447;
-}
-#rules ol { 
-  text-align: left; 
-  margin: 8px 0 0 28px; 
-  font-size: 1em; 
-}
-
 #menu input, #menu button { 
   margin: 10px; 
   padding: 12px; 
-  font-size: 18px; 
+  font-size: 18px;
 }
 #menu button { 
   background: linear-gradient(90deg, #FFA447, #00B4D8); 
@@ -80,26 +64,22 @@ header {
   margin-top: 6px; 
   align-items: flex-start;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
-/* Chat now left-aligned and styled as a card */
 #chatPanel {
-  display: flex;
-  flex-direction: column;
-  width: 500px;
+  width: 100%;
+  max-width: 500px;
   background: #444e68;
   padding: 18px 16px 12px;
   border-radius: 16px;
   box-shadow: 0 2px 12px #2225;
-  min-height: 520px;
-  max-height: 520px;
-  margin-right: 5px;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
 }
 #chat { 
   flex: 1;
-  min-height: 370px;
-  max-height: 410px;
+  min-height: 300px;
   overflow-y: auto; 
   background: #394867; 
   padding: 10px; 
@@ -110,10 +90,9 @@ header {
 #chatInputRow {
   display: flex;
   gap: 10px;
-  align-items: center;
 }
 #chatInput { 
-  width: 100%; 
+  flex: 1;
   padding: 10px; 
   font-size: 16px; 
   border-radius: 7px; 
@@ -122,157 +101,121 @@ header {
 }
 #chatSendBtn {
   padding: 10px 24px;
-  font-size: 15px;
   background: #FFA447;
   color: #222;
   border-radius: 7px;
   border: none;
   cursor: pointer;
-  transition: background .15s;
 }
 #chatSendBtn:hover {
   background: #00B4D8;
   color: #fff;
 }
 
-
 #canvas {
   background: white;
   border: 3px solid #FFA447;
   border-radius: 12px;
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><line x1="16" y1="0" x2="16" y2="32" stroke="black" stroke-width="2"/><line x1="0" y1="16" x2="32" y2="16" stroke="black" stroke-width="2"/></svg>') 16 16, crosshair;
-  transition: box-shadow 0.2s;
-  margin-right: 5px;
+  cursor: crosshair;
+  touch-action: none; /* Important for mobile drawing */
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 8 / 5;
+  box-shadow: 0 4px 20px #0004;
 }
 
-#canvas:active { 
-  box-shadow: 0 0 20px #FFA44766; 
-}
-
-/* Sidebar (now right of canvas) */
 #sidebar { 
   width: 320px; 
+  max-width: 100%;
   background: #506680; 
-  padding: 16px 12px 12px; 
+  padding: 16px 12px; 
   border-radius: 12px;  
   display: flex; 
   flex-direction: column; 
-  gap: 8px; 
+  gap: 12px; 
   box-shadow: 0px 2px 12px #1114;
 }
 
 #wordHint { 
   font-size: 26px; 
-  margin: 8px 0; 
   font-weight: bold; 
   color: #FFA447;
+  text-align: center;
 }
 #wordChoices button { 
-  display: block; 
-  width: 100%; 
-  margin: 8px 0; 
-  padding: 12px; 
-  font-size: 18px; 
-  border-radius: 6px; 
-  background: #FFD6A5; 
-  color: #222; 
+  padding: 14px;
+  margin: 6px 0;
+  font-size: 18px;
+  background: #FFD6A5;
+  color: #222;
   border: none;
+  border-radius: 8px;
 }
 #wordChoices button:hover { 
   background: #FFA447; 
   color: #fff; 
 }
 
-#tools { 
-  margin: 15px 0 2px 0; 
-  text-align: center; 
-}
-
 #colorPalette { 
   display: flex; 
   flex-wrap: wrap; 
-  gap: 7px; 
-  justify-content: center; 
-  margin-bottom: 8px;
+  gap: 8px; 
+  justify-content: center;
 }
 .palette-swatch { 
-  width: 32px; 
-  height: 32px; 
+  width: 36px; 
+  height: 36px; 
   border-radius: 50%; 
-  border: 2px solid #bbbbbb90; 
-  cursor: pointer; 
-  outline: 2px solid #fff0; 
-  display: inline-block; 
-  transition: outline 0.1s, border 0.1s;
+  border: 3px solid #fff;
+  cursor: pointer;
+  transition: all 0.2s;
 }
-.palette-swatch.selected, .palette-swatch:focus { 
-  outline: 3px solid #FFA447; 
-  border: 2.5px solid #222; 
-}
-
-#colorPicker, #brushSize { 
-  margin: 0 7px 0 0;
+.palette-swatch.selected { 
+  transform: scale(1.2);
+  box-shadow: 0 0 0 4px #FFA447;
 }
 
 #clearBtn { 
   margin-top: 10px; 
-  padding: 7px 22px; 
-  border-radius: 8px; 
+  padding: 12px;
   background: #00B4D8; 
   color: #fff; 
-  font-size: 1rem; 
   border: none;
+  border-radius: 8px;
+  font-weight: bold;
 }
-#clearBtn:hover { 
-  background: #FFA447; 
-  color: #222;
-}
+#clearBtn:hover { background: #FFA447; color: #222; }
 
-#players { 
-  margin-top: 18px;
-}
-.player { 
-  padding: 8px; 
-  background: #314455; 
-  margin: 5px 0; 
-  border-radius: 6px; 
+#players .player { 
+  padding: 10px;
+  background: #314455;
+  margin: 6px 0;
+  border-radius: 8px;
   font-weight: 500;
 }
 
-.hidden { 
-  display: none !important; 
-}
+.hidden { display: none !important; }
 
-@media (max-width: 900px) {
+/* RESPONSIVE — FIXED & BEAUTIFUL ON MOBILE */
+@media (max-width: 1024px) {
   #main {
     flex-direction: column;
-    align-items: stretch;
-    gap: 0;
+    align-items: center;
   }
-  #sidebar, #chatPanel, #friendsChatPanel {
-    width: 100%!important;
-    min-width: unset!important;
-    max-width: unset!important;
-    margin: 0 0 16px 0!important;
+  #chatPanel, #sidebar {
+    width: 100%;
+    max-width: 600px;
   }
   #canvas {
-    width: 98vw!important;
-    min-width: 100vw!important;
-    max-width: 150vw!important;
-    height: 200vw!important;
-    max-height: 550vw!important;
-    border-radius: 12px;
-  }
-  #chat, #friendsChat {
-    max-height: 15vw!important;
+    width: 100%;
+    max-width: 800px;
   }
 }
-@media (max-width:600px) {
-  #main, #topBar, #sidebar, #chatPanel, #friendsChatPanel, #players, #menu, header, #game {
-    padding-left: 1vw!important;
-    padding-right: 1vw!important;
-    font-size:1em!important;
-  }
-  #canvas { height:120vw!important; }
-  #chat, #friendsChat { max-height: 20px!important; }
+
+@media (max-width: 600px) {
+  #topBar { flex-direction: column; gap: 8px; text-align: center; }
+  #timer { font-size: 1.8em; }
+  #chat { min-height: 200px; }
+  #wordHint { font-size: 22px; }
+  .palette-swatch { width: 42px; height: 42px; }
 }
