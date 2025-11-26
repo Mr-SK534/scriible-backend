@@ -210,6 +210,13 @@ header {
     width: 100%;
     max-width: 800px;
   }
+
+  #canvas {
+  touch-action: none; /* Prevents scrolling while drawing on mobile */
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
 }
 
 @media (max-width: 600px) {
@@ -219,3 +226,4 @@ header {
   #wordHint { font-size: 22px; }
   .palette-swatch { width: 42px; height: 42px; }
 }
+

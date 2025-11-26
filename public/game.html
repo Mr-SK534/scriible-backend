@@ -14,42 +14,45 @@
   <div id="menu">
     <input id="username" type="text" placeholder="Enter your name" maxlength="16">
     <input id="roomCode" type="text" placeholder="Room code (6 letters)" maxlength="6" style="text-transform:uppercase">
+    
+    <!-- NEW: Choose Number of Rounds -->
+    <div style="margin: 20px 0; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 18px; color:#fff;">
+      <label for="numRounds">Rounds:</label>
+      <input id="numRounds" type="number" min="3" max="20" value="6" 
+             style="width: 90px; padding: 12px; font-size: 18px; text-align: center; border-radius: 8px; border: 2px solid #FFA447; background:#394867; color:#fff;">
+    </div>
+
     <button onclick="createRoom()">Create Room</button>
     <button onclick="joinRoom()">Join Room</button>
-    <div id="error"></div>
+    <div id="error" style="color:#ff6b6b; min-height:24px; margin-top:10px;"></div>
   </div>
 
   <div id="game" class="hidden">
     <div id="topBar" style="background:#333;">
       <div id="roomDisplay" style="color:#FFA447;font-weight:bold;">Room:</div>
-      <div id="roundInfo" style="color:#fff;"></div>
-      <div id="timer" style="color:#FFA447;"></div>
+      <div id="roundInfo" style="color:#fff;">Round 0/6</div>
+      <div id="timer" style="color:#FFA447;">80</div>
     </div>
     <div id="main">
-      <!-- Chat panel for game guesses -->
       <div id="chatPanel">
         <h3 style="color:#00B4D8;margin-bottom:8px;">Guess Chat</h3>
-        <div id="chat">
-          <div id="messages"></div>
-        </div>
+        <div id="chat"><div id="messages"></div></div>
         <div id="chatInputRow">
           <input type="text" id="chatInput" placeholder="Type guess or message..." maxlength="100">
-          <button id="chatSendBtn" type="button">Send</button>
+          <button id="chatSendBtn">Send</button>
         </div>
       </div>
-      <!-- Drawing canvas -->
       <canvas id="canvas" width="800" height="500"></canvas>
-      <!-- Sidebar with palette, players, word hint, choices -->
       <div id="sidebar">
         <div id="players" style="margin-bottom:17px;text-align:left;"></div>
-        <div id="wordHint"></div>
+        <div id="wordHint" style="font-size:26px;font-weight:bold;color:#FFA447;">Waiting...</div>
         <div id="wordChoices" class="hidden"></div>
         <div id="colorPalette" style="margin:12px 0;"></div>
-        <input type="color" id="colorPicker" value="#000000" style="margin-bottom:8px;">
-        <div id="colorNameDisplay"></div>
-        <label for="brushSize" style="display:block;margin-top:10px;">Brush Size:</label>
-        <input type="range" id="brushSize" min="2" max="36" step="1" value="5" style="width:80%;">
-        <button id="clearBtn" style="display:block;margin:14px 0 8px 0;">Clear Canvas</button>
+        <input type="color" id="colorPicker" value="#000000">
+        <div id="colorNameDisplay" style="margin:5px 0; color:#FFA447;"></div>
+        <label for="brushSize">Brush Size:</label>
+        <input type="range" id="brushSize" min="2" max="36" value="5" style="width:100%;">
+        <button id="clearBtn">Clear Canvas</button>
       </div>
     </div>
   </div>
