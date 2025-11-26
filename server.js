@@ -22,11 +22,26 @@ const rooms = {};
 const ROUND_TIME = 80;
 
 const wordList = [
+  // Simple/Classic
   "cat", "dog", "house", "tree", "car", "sun", "moon", "star", "fish", "bird",
   "apple", "banana", "pizza", "cake", "rainbow", "rocket", "castle", "dragon",
   "unicorn", "computer", "phone", "book", "mountain", "ocean", "giraffe",
-  "elephant", "penguin", "butterfly", "flower", "heart", "smile", "fire"
+  "elephant", "penguin", "butterfly", "flower", "heart", "smile", "fire",
+  "key", "cloud", "boat", "hat", "shoe", "egg", "chair", "train", "train", "bus", "map",
+  "whale", "island", "plane", "bottle", "circle", "ear", "nose", "balloon", "candle",
+  "guitar", "bicycle", "truck", "cow", "robot", "turtle", "octopus", "rocket", "starfish",
+  "lion", "tiger", "bear", "wolf", "rose", "leaf", "cup", "spoon", "mirror", "glove",
+  "ring", "watch", "backpack", "girl", "boy", "dress", "monkey", "banana", "hand", "foot",
+  "window", "door", "bed", "tower", "cloud", "camera", "teeth", "spider", "cupcake", "cookie", "belt",
+  "fork", "cake", "broom", "duck", "pear", "ant", "banana", "desk", "snail", "fan",
+ 
+  "microscope", "helicopter", "skyscraper", "refrigerator", "lighthouse",
+  "parachute", "recycle", "headphones", "fountain", "flashlight", 
+  "thermometer", "compass", "bulldozer", "wheelchair", "shoppingcart",
+  "disco ball", "fire extinguisher", "washing machine", "submarine", "wind turbine",
+  "mountaineer", "astronaut", "traffic jam", "vending machine", "magnifying glass"
 ];
+
 
 // -------------------- Helpers --------------------
 function getRoomCodeFromSocket(socket) {
